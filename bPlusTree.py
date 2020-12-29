@@ -1,123 +1,154 @@
+from __future__ import annotations
 import time
 from os import listdir
 from os.path import isfile, join, dirname
 import string
 import re
 
+from math import floor
+from random import randint
 MYDIR = dirname(__file__)  # gives back your directory path
 
-"""
-m = order
-Before inserting an element into a B+ tree, these properties must be kept in mind.
-    The root has at least two children.
-    Each node except root can have a maximum of m children and at least m/2 children.
-    Each node can contain a maximum of m - 1 keys and a minimum of ⌈m/2⌉ - 1 keys.
-"""
-
-
-class Node(object):
+class Node:
     """
     Base node object.
-    Each node stores keys and values. Keys are not unique to each value, and
-    as such values are stored as a list under each key.
     Attributes:
-        order (int): The maximum number of keys each node can hold.
+        order (int): The maximum number of keys each node can hold (branching factor).
     """
+    uidCounter = 0
 
     def __init__(self, order):
         self.order = order
+        self.parent: Node = None
         self.keys = []
         self.values = []
-        self.leaf = True
 
-    def insert_at_leaf(self, key, value):
-        """
-        Adds a key-value pair to the node.
-        """
-        if not self.keys:  # if leaf is empty
+        #  This is for Debugging purposes only!
+        Node.uidCounter += 1
+        self.uid = self.uidCounter
+
+    def split(self) -> Node:  # Split a full Node to two new ones.
+        left = Node(self.order)
+        right = Node(self.order)
+        mid = int(self.order // 2)
+
+        left.parent = right.parent = self
+
+        left.keys = self.keys[:mid]
+        left.values = self.values[:mid + 1]
+
+        right.keys = self.keys[mid + 1:]
+        right.values = self.values[mid + 1:]
+
+        self.values = [left, right]  # Setup the pointers to child nodes.
+
+        self.keys = [self.keys[mid]]  # Hold the first element from the right subtree.
+
+        # Setup correct parent for each child node.
+        for child in left.values:
+            if isinstance(child, Node):
+                child.parent = left
+
+        for child in right.values:
+            if isinstance(child, Node):
+                child.parent = right
+
+        return self  # Return the 'top node'
+
+    def getSize(self) -> int:
+        return len(self.keys)
+
+    def isEmpty(self) -> bool:
+        return len(self.keys) == 0
+
+    def isFull(self) -> bool:
+        return len(self.keys) == self.order - 1
+
+    def isNearlyUnderflow(self) -> bool:  # Used to check on keys, not data!
+        return len(self.keys) <= floor(self.order / 2)
+
+    def isUnderflow(self) -> bool:  # Used to check on keys, not data!
+        return len(self.keys) <= floor(self.order / 2) - 1
+
+    def isRoot(self) -> bool:
+        return self.parent is None
+
+
+class LeafNode(Node):
+    def __init__(self, order):
+        super().__init__(order)
+
+        self.prevLeaf: LeafNode = None
+        self.nextLeaf: LeafNode = None
+
+    # TODO: Implement an improved version
+    def add(self, key, value):
+        if not self.keys:  # Insert key if it doesn't exist
             self.keys.append(key)
             self.values.append([value])
-            return None
+            return
 
-        for i, item in enumerate(self.keys):  # else search...
-            if key == item:
-                self.values[i].append(value)
+        for i, item in enumerate(self.keys):  # Otherwise, search key and append value.
+            if key == item:  # Key found => Append Value
+                self.values[i].append(value)  # Remember, this is a list of data. Not nodes!
                 break
 
-            elif key < item:
+            elif key < item:  # Key not found && key < item => Add key before item.
                 self.keys = self.keys[:i] + [key] + self.keys[i:]
                 self.values = self.values[:i] + [[value]] + self.values[i:]
                 break
-            # If reaches the end of the cursor node
-            elif i + 1 == len(self.keys):
+
+            elif i + 1 == len(self.keys):  # Key not found here. Append it after.
                 self.keys.append(key)
                 self.values.append([value])
                 break
 
-    def split(self):
-        """
-        Splits the node into two and stores them as child nodes.
-        """
-        # 1. Split the leaf node into two nodes.
-        left = Node(self.order)
-        right = Node(self.order)
-        mid = int(self.order / 2)
+    def split(self) -> Node:  # Split a full leaf node. (Different method used than before!)
+        top = Node(self.order)
+        right = LeafNode(self.order)
+        mid = int(self.order // 2)
 
-        # 2. First node contains ceil((m-1)/2) values.
-        left.keys = self.keys[:mid]
-        left.values = self.values[:mid]
+        self.parent = right.parent = top
 
-        # 3.Second node contains the remaining values.
         right.keys = self.keys[mid:]
         right.values = self.values[mid:]
+        right.prevLeaf = self
+        right.nextLeaf = self.nextLeaf
 
-        # 4.Copy the smallest search key value from second node to the parent node.(Right biased)
-        self.keys = [right.keys[0]]
-        self.values = [left, right]
-        self.leaf = False
+        top.keys = [right.keys[0]]
+        top.values = [self, right]  # Setup the pointers to child nodes.
 
-    def is_full(self):
-        """
-        Returns True if the node is full.
-        """
-        return len(self.keys) == self.order
+        self.keys = self.keys[:mid]
+        self.values = self.values[:mid]
+        self.nextLeaf = right  # Setup pointer to next leaf
+
+        return top  # Return the 'top node'
 
 
 class BPlusTree(object):
-    """
-    B+ tree object, consisting of nodes.
-    Nodes will automatically be split into two once it is full. When a split
-    occurs, a key will 'float' upwards and be inserted into the parent node to
-    act as a pivot.
-    Attributes:
-        order (int): The maximum number of keys each node can hold.
-    """
+    def __init__(self, order=4):
+        self.root: Node = LeafNode(order)  # First node must be leaf (to store data).
+        self.order: int = order
 
-    def __init__(self, order=8):
-        self.root = Node(order)
-
-    def _find(self, node, key):
-        """
-        For a given node and key, returns the index where the key should be
-        inserted and the list of values at that index.
-        """
+    @staticmethod
+    def _find(node: Node, key):
         for i, item in enumerate(node.keys):
             if key < item:
                 return node.values[i], i
+            elif i + 1 == len(node.keys):
+                return node.values[i + 1], i + 1  # return right-most node/pointer.
 
-        return node.values[i + 1], i + 1
-
-    def _insertInParent(self, parent, child, index):
-        """
-        For a parent and child node, extract a pivot from the child to be
-        inserted into the keys of the parent. Insert the values from the child
-        into the values of the parent.
-        """
+    @staticmethod
+    def _mergeUp(parent: Node, child: Node, index):
         parent.values.pop(index)
         pivot = child.keys[0]
 
+        for c in child.values:
+            if isinstance(c, Node):
+                c.parent = parent
+
         for i, item in enumerate(parent.keys):
-            if pivot < item:  #αν εχει λιγοτερους δεικτες απο item
+            if pivot < item:
                 parent.keys = parent.keys[:i] + [pivot] + parent.keys[i:]
                 parent.values = parent.values[:i] + child.values + parent.values[i:]
                 break
@@ -128,50 +159,126 @@ class BPlusTree(object):
                 break
 
     def insert(self, key, value):
-        """
-        Inserts a key-value pair after traversing to a leaf node. If the leaf
-        node is full, split the leaf node into two.
-        """
-        parent = None
-        child = self.root
-        # Traverse tree until leaf node is reached.
-        while not child.leaf:
-            parent = child
-            child, index = self._find(child, key)
+        node = self.root
 
-        child.insert_at_leaf(key, value)
-        print(key)
+        while not isinstance(node, LeafNode):  # While we are in internal nodes... search for leafs.
+            node, index = self._find(node, key)
 
-        # Case 1: leaf overflow
-        if child.is_full():
-            child.split()
-            # Once a leaf node is split, it consists of a internal node and two leaf nodes. These
-            # need to be re-inserted back into the tree.
-            if parent and not parent.is_full():
-                self._insertInParent(parent, child, index)
+        # Node is now guaranteed a LeafNode!
+        node.add(key, value)
 
-    def retrieve(self, key, file):
-        """
-        Returns a value for a given key, and None if the key does not exist.
-        """
-        child = self.root
+        while len(node.keys) == node.order:  # 1 over full
+            if not node.isRoot():
+                parent = node.parent
+                node = node.split()  # Split & Set node as the 'top' node.
+                jnk, index = self._find(parent, node.keys[0])
+                self._mergeUp(parent, node, index)
+                node = parent
+            else:
+                node = node.split()  # Split & Set node as the 'top' node.
+                self.root = node  # Re-assign (first split must change the root!)
 
-        while not child.leaf:
-            child, index = self._find(child, key)
+    def retrieve(self, key, max):
+        node = self.root
+        flag = True
+        while not isinstance(node, LeafNode):
+            node, index = self._find(node, key)
 
-        for i, item in enumerate(child.keys):
+        while flag:
+            for i, node_data in enumerate(node.keys):
+                print(node_data)
+                if node_data > max:
+
+                   print('[{}]'.format(', '.join(map(str, node_data))), end=' -> ')
+                   flag = False
+                   break
+            node = node.nextLeaf
+
+        for i, item in enumerate(node.keys):
             if key == item:
-                return child.values[i], file
-        print("Not found in:", file)
+                return node.values[i]
+
+        return None
 
 
-def bplustree(dictionary, search, doc):
+    def printTree(self):
+        if self.root.isEmpty():
+            print('The bpt+ Tree is empty!')
+            return
+        queue = [self.root, 0]  # Node, Height... Not systematic but it works
+
+        while len(queue) > 0:
+            node = queue.pop(0)
+            height = queue.pop(0)
+
+            if not isinstance(node, LeafNode):
+                queue += self.intersperse(node.values, height + 1)
+            print('Level ' + str(height), '|'.join(map(str, node.keys)), ' -->\t current -> ', node.uid,
+                  '\t parent -> ',
+                  node.parent.uid if node.parent else None)
+
+    def getLeftmostLeaf(self):
+        if not self.root:
+            return None
+
+        node = self.root
+        while not isinstance(node, LeafNode):
+            node = node.values[0]
+
+        return node
+
+    def getRightmostLeaf(self):
+        if not self.root:
+            return None
+
+        node = self.root
+        while not isinstance(node, LeafNode):
+            node = node.values[-1]
+
+    def showAllData(self):
+        node = self.getLeftmostLeaf()
+        if not node:
+            return None
+
+        while node:
+            for node_data in node.values:
+                print('[{}]'.format(', '.join(map(str, node_data))), end=' -> ')
+
+            node = node.nextLeaf
+        print('Last node')
+
+    def showAllDataReverse(self):
+        node = self.getRightmostLeaf()
+        if not node:
+            return None
+
+        while node:
+            for node_data in reversed(node.values):
+                print('[{}]'.format(', '.join(map(str, node_data))), end=' <- ')
+
+            node = node.prevLeaf
+        print()
+
+    @staticmethod
+    def intersperse(lst, item):
+        result = [item] * (len(lst) * 2)
+        result[0::2] = lst
+        return result
+
+def bplustree(dictionary, min, max, doc):
     bplustree = BPlusTree(order=4)
-
+    lg = sorted(dictionary, key=str.lower)
+    print(sorted(dictionary, key=str.lower))
+    print(dictionary)
+    i = 0
     for d in dictionary:
-        bplustree.insert(d, doc)
+        bplustree.insert(d, d)
 
-    print(bplustree.retrieve(search, doc))
+        i = i + 1
+    bplustree.printTree()
+    bplustree.showAllData()
+    print()
+    print(bplustree.retrieve(min,max))
 
 
 # find all documents in the theme that was asked
@@ -188,56 +295,62 @@ def docs_to_search(path_of_docs):
     return file_info
 
 
-# create dictionary with the words of each document
-def dict_of_words(doc):
-    # words = {}
-    file = open(doc, "r", encoding="UTF-8", errors='ignore')
-    words = file.read()
-    words = list(words.split())
-    # print(words)
-    return words
-
-
 def Preprocessing(contentsRaw):
 
     # convert to lowercase
     contentsRaw = [term.lower() for term in contentsRaw]
 
+    # remove punctuation
     sth = []
     for word in contentsRaw:
-
-        # table = str.maketrans(dict.fromkeys(string.punctuation))  # OR {key: None for key in string.punctuation}
-        # new_s = word.translate(table)
         new_s = re.sub(r'[^\w\s]', '', word)
         sth.append(new_s)
 
     filteredContents = sth
+
+    # remove stopwords
+    from nltk.corpus import stopwords
+    set(stopwords.words("english"))
+    filteredContents = [word for word in filteredContents if word not in stopwords.words('english')]
+    # for word in filteredContents:
+    #     if word > "r":
+    #      print(word)
     return filteredContents
 
 
 def main():
     elapsed_time = 0.0
     documents = ""
-    # input_theme = input("Type the theme of documents that you want to search. e.g.atheism,med,space...")
-    # example directory C:\Users\lefteris\.spyder-py3
+   
     path_of_docs = MYDIR + '/sample/'  # + input_theme  # execute path+files or dataset +file of documents
-    # example result of the above live C:\Users\lefteris\.spyder-py3\data_set\alt.atheism
 
     documents = docs_to_search(path_of_docs)
-    search = input("Type the word or phrase you are looking for: ")
-    # search in every document
+   
+    print("Type 'R' for range query")
+    print("Type 'E' for exact query")
+    query_type = input("Please select the type of the query:")
+
+    if query_type == "R":
+        l_bound = input("Please type the lower bound: ")
+        u_bound = input("Please type the upper bound: ")
+    else:
+        l_bound = input("Please type word you are looking for: ")
+        u_bound = l_bound
+
     point = 0  # to keep track of which text I am searching into
     for doc in documents[1]:
-        raw_dictionary = dict_of_words(doc)
-        # print(raw_dictionary)
+        # load file
+        file = open(doc, "r", encoding="UTF-8", errors='ignore')
+        words = file.read()
+        raw_dictionary = list(words.split())
+
         raw_dictionary = Preprocessing(raw_dictionary)
         dictionary = ""
         for r in raw_dictionary:
             dictionary += r
 
-        # print(dictionary)
         start_time = time.time()
-        bplustree(raw_dictionary, search, documents[0][point])
+        bplustree(raw_dictionary, l_bound, u_bound,  documents[0][point])
         end_time = time.time()
         elapsed_time += end_time - start_time
         point += 1
