@@ -1,17 +1,15 @@
 from __future__ import annotations
-import time
 from os import listdir
 from os.path import isfile, join, dirname
-import string
 import re
-
 from math import floor
-from random import randint
+
 MYDIR = dirname(__file__)  # gives back your directory path
+
 
 class Node:
     """
-    Base node object.
+    Node object
     Attributes:
         order (int): The maximum number of keys each node can hold (branching factor).
     """
@@ -55,20 +53,8 @@ class Node:
 
         return self  # Return the 'top node'
 
-    def getSize(self) -> int:
-        return len(self.keys)
-
     def isEmpty(self) -> bool:
         return len(self.keys) == 0
-
-    def isFull(self) -> bool:
-        return len(self.keys) == self.order - 1
-
-    def isNearlyUnderflow(self) -> bool:  # Used to check on keys, not data!
-        return len(self.keys) <= floor(self.order / 2)
-
-    def isUnderflow(self) -> bool:  # Used to check on keys, not data!
-        return len(self.keys) <= floor(self.order / 2) - 1
 
     def isRoot(self) -> bool:
         return self.parent is None
@@ -81,7 +67,6 @@ class LeafNode(Node):
         self.prevLeaf: LeafNode = None
         self.nextLeaf: LeafNode = None
 
-    # TODO: Implement an improved version
     def add(self, key, value):
         if not self.keys:  # Insert key if it doesn't exist
             self.keys.append(key)
@@ -178,34 +163,38 @@ class BPlusTree(object):
                 node = node.split()  # Split & Set node as the 'top' node.
                 self.root = node  # Re-assign (first split must change the root!)
 
-    def retrieve(self, key, max):
+    def retrieve(self, key, max, query):
+        keys_values = []
         node = self.root
         flag = True
         while not isinstance(node, LeafNode):
             node, index = self._find(node, key)
 
-        while flag:
-            for i, node_data in enumerate(node.keys):
-                print(node_data)
-                if node_data > max:
+        if query == 'r':  # range query
+            while flag and node:
+                for i, node_data in enumerate(node.keys):
+                    print(node_data, node.values[i])
+                    if node_data >= max:
+                        flag = False
+                        break
+                    keys_values.append([node_data, node.values[i]])
+                node = node.nextLeaf
+            return keys_values
 
-                   print('[{}]'.format(', '.join(map(str, node_data))), end=' -> ')
-                   flag = False
-                   break
-            node = node.nextLeaf
+        else:  # exact query
+            for i, item in enumerate(node.keys):
+                if key == item:
+                    print("found: keys:", node.keys[i], " found: value ", node.values[i])
+                    return node.values[i]
 
-        for i, item in enumerate(node.keys):
-            if key == item:
-                return node.values[i]
-
+        print("Word not found")
         return None
-
 
     def printTree(self):
         if self.root.isEmpty():
             print('The bpt+ Tree is empty!')
             return
-        queue = [self.root, 0]  # Node, Height... Not systematic but it works
+        queue = [self.root, 0]
 
         while len(queue) > 0:
             node = queue.pop(0)
@@ -214,8 +203,7 @@ class BPlusTree(object):
             if not isinstance(node, LeafNode):
                 queue += self.intersperse(node.values, height + 1)
             print('Level ' + str(height), '|'.join(map(str, node.keys)), ' -->\t current -> ', node.uid,
-                  '\t parent -> ',
-                  node.parent.uid if node.parent else None)
+                  '\t parent -> ', node.parent.uid if node.parent else None)
 
     def getLeftmostLeaf(self):
         if not self.root:
@@ -265,23 +253,20 @@ class BPlusTree(object):
         result[0::2] = lst
         return result
 
-def bplustree(dictionary, min, max, doc):
-    bplustree = BPlusTree(order=4)
-    lg = sorted(dictionary, key=str.lower)
-    print(sorted(dictionary, key=str.lower))
-    print(dictionary)
-    i = 0
-    for d in dictionary:
-        bplustree.insert(d, d)
 
-        i = i + 1
+def bplustree(dictionary):
+    bplustree = BPlusTree(order=4)
+
+    for doc in dictionary:  # for each document
+        for word in doc[0]:  # for each word in document
+            bplustree.insert(word, doc[1])
+            print(word, doc[1])
+
     bplustree.printTree()
     bplustree.showAllData()
-    print()
-    print(bplustree.retrieve(min,max))
+    return bplustree
 
 
-# find all documents in the theme that was asked
 def docs_to_search(path_of_docs):
     file_info = []
     try:
@@ -296,7 +281,6 @@ def docs_to_search(path_of_docs):
 
 
 def Preprocessing(contentsRaw):
-
     # convert to lowercase
     contentsRaw = [term.lower() for term in contentsRaw]
 
@@ -312,49 +296,53 @@ def Preprocessing(contentsRaw):
     from nltk.corpus import stopwords
     set(stopwords.words("english"))
     filteredContents = [word for word in filteredContents if word not in stopwords.words('english')]
-    # for word in filteredContents:
-    #     if word > "r":
-    #      print(word)
+
     return filteredContents
 
 
 def main():
-    elapsed_time = 0.0
-    documents = ""
-   
-    path_of_docs = MYDIR + '/sample/'  # + input_theme  # execute path+files or dataset +file of documents
-
-    documents = docs_to_search(path_of_docs)
-   
-    print("Type 'R' for range query")
-    print("Type 'E' for exact query")
-    query_type = input("Please select the type of the query:")
-
-    if query_type == "R":
-        l_bound = input("Please type the lower bound: ")
-        u_bound = input("Please type the upper bound: ")
-    else:
-        l_bound = input("Please type word you are looking for: ")
-        u_bound = l_bound
-
+    query_type = ""
+    dictionary = []
     point = 0  # to keep track of which text I am searching into
+
+    # build tree
+    path_of_docs = MYDIR + '/Datasets/corpus20090418'  # + input_theme  # execute path+files or dataset +file of documents
+    documents = docs_to_search(path_of_docs)
     for doc in documents[1]:
-        # load file
-        file = open(doc, "r", encoding="UTF-8", errors='ignore')
-        words = file.read()
-        raw_dictionary = list(words.split())
-
-        raw_dictionary = Preprocessing(raw_dictionary)
-        dictionary = ""
-        for r in raw_dictionary:
-            dictionary += r
-
-        start_time = time.time()
-        bplustree(raw_dictionary, l_bound, u_bound,  documents[0][point])
-        end_time = time.time()
-        elapsed_time += end_time - start_time
+        file = open(doc, "r", encoding="UTF-8", errors='ignore')  # open file
+        words = file.read()  # read file
+        raw_dictionary = list(words.split())  # text to list
+        doc_dictionary = [Preprocessing(raw_dictionary), documents[0][point]]  # words preprocessing
         point += 1
-    print("epalsed time:", elapsed_time)
+        dictionary.append(doc_dictionary)
+
+    tree = bplustree(dictionary)
+
+    # queries
+    while query_type != "r" and query_type != "e" and query_type != "q":
+        print("\nType 'r' for range query")
+        print("Type 'e' for exact query")
+        print("Type 'q' for exit")
+        query_type = input("Please select the type of the query:")
+
+        if query_type == "r":
+            l_bound = input("Please type the lower bound: ")
+            u_bound = input("Please type the upper bound: ")
+
+            if l_bound > u_bound:  # if not given in the correct order, then change the order
+                temp = u_bound
+                u_bound = l_bound
+                l_bound = temp
+
+            tree.retrieve(l_bound, u_bound, query_type)
+            query_type = ""
+        elif query_type == 'e':
+            l_bound = input("Please type word you are looking for: ")
+            u_bound = l_bound
+            tree.retrieve(l_bound, u_bound, query_type)
+            query_type = ""
+        elif query_type == 'q':
+            return
 
 
 if __name__ == '__main__':
