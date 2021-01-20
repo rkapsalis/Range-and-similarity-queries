@@ -4,32 +4,26 @@ import random
 import re
 from os.path import isfile, join, dirname
 import os
-import time
 import nltk
-nltk.download('stopwords')
 from nltk.corpus import stopwords
 
-MYDIR = dirname(__file__)  # gives back your directory path
 
-k = 5
-shingles = []
-hashed_shingles = []
-zip_list = []
-input_matrix = []
-docs = [""]  # names of documents
 # get documents directory
-path_of_docs = MYDIR + '/corpus20090418'
-# documents = docs_to_search(path_of_docs)
-
-start = time.time()
-print("Preproccesing...")
 
 
-def shingles():
+
+def create_shingles(MYDIR):
+    k = 5
+    docs = [""]
+    zip_list = []
+    shingles = []
+    hashed_shingles = []
+    path_of_docs = MYDIR + '/sample/'
+    print("Preproccesing...")
     for root, dirs, files in os.walk(path_of_docs, topdown=False):
         # for every file
         for name in files:
-    
+            print("name", name)
             doc = os.path.join(root, name)
             # read file
             file = open(doc, "r", encoding="UTF-8", errors='ignore')
@@ -37,7 +31,7 @@ def shingles():
             file = file.read().replace('\n', ' ').replace('\r', ' ')
             # remove punctuation
             new_s = re.sub(r'[^\w\s]', ' ', file.lower())
-    
+
             set(stopwords.words("english"))
             # remove stopwords
             filteredContents = [word for word in new_s.split() if word not in stopwords.words('english')]
@@ -47,32 +41,30 @@ def shingles():
             for i in range(len(filteredContents) - k + 1):
                 # create singles
                 shingle = filteredContents[i:i + k]
-                # if the shingle is not in the list
-                if not any((x[0] == shingle) for x in zip_list):
-                    # store shingle in array
-                    shingles.append(shingle)
-                    # store shingle and document name in array
-                    zip_list.append([shingle, [name]])
-                else:
-                    # store name of document in the corresponding position
-                    position = [(i, el.index(shingle)) for i, el in enumerate(zip_list) if shingle in el[0]]
-                    if not name in zip_list[position[0][0]][1]:
-                        zip_list[position[0][0]][1].append(name)
                 # create hashed shingle
                 hashed = binascii.crc32(shingle.encode('utf8')) & 0xffffffff  # --------- 32bit ---------
-    
                 if hashed not in hashed_shingles:
                     # store unique hashed shingles
                     hashed_shingles.append(hashed)
-    return hashed_shingles, docs   
-    
-    
-for r in range(len(zip_list)):
-    print("zip_list: ", zip_list[r])
+                # if the shingle is not in the list
+                if not any((x[0] == hashed) for x in zip_list):
+                    # store shingle in array
+                    shingles.append(shingle)
+                    # store shingle and document name in array
+                    zip_list.append([hashed, [name]])
+                else:
+                    # store name of document in the corresponding position
+                    position = [(i, el.index(hashed)) for i, el in enumerate(zip_list) if hashed == el[0]]
+                    if name not in zip_list[position[0][0]][1]:
+                        zip_list[position[0][0]][1].append(name)
+
+    for r in range(len(zip_list)):
+        print("zip_list: ", zip_list[r])
+    return zip_list, docs
 
 
-def input_matrix(zip_list, docs):
-   
+def create_input_matrix(zip_list, docs):
+    input_matrix = []
     # store document names in first row
     input_matrix.append(docs)
 
@@ -89,32 +81,21 @@ def input_matrix(zip_list, docs):
         # store row in input matrix
         input_matrix.append(row)
 
-    end_time = time.time()
-
     for r in range(len(input_matrix)):
         print(input_matrix[r])
     return input_matrix
 
 
 def next_prime(value):  # find next prime number ### def next_prime(value):
-    for num in range(value, value ** value):  # for num in range(value,2**33): ν παίρνεις την επόμενη δύναμη
+    for num in range(value, value*value):  # for num in range(value,2**33): ν παίρνεις την επόμενη δύναμη
         if all(num % i != 0 for i in range(2, int(math.sqrt(num)) + 1)):
             return num
-
-
-# number of hash functions
-hash_no = 10
-# max shingle value
-max_shingle_value = 2 ** 32 - 1
-p = next_prime(max_shingle_value+1)  # p = next_prime(max_shingle_value)
-
-a = random.randint(1, p - 1)
-b = random.randint(0, p - 1)
 
 
 def randomCoefficients(functions_no):
     randomNumbers = []
     functions_counter = 0
+    max_shingle_value = 2 ** 32 - 1
     while functions_counter < functions_no:
         # generate random number in range (0, max_shingle_value)
         random_number = random.randint(0, max_shingle_value)
@@ -129,7 +110,12 @@ def randomCoefficients(functions_no):
     return randomNumbers
 
 
-def minHash(input_matrix):
+def minHash(input_matrix, docs):
+    # number of hash functions
+    hash_no = 10
+    # max shingle value
+    max_shingle_value = 2 ** 32 - 1
+    p = next_prime(max_shingle_value + 1)  # p = next_prime(max_shingle_value)
     a_coef = randomCoefficients(hash_no)
     b_coef = randomCoefficients(hash_no)
 
@@ -161,10 +147,11 @@ def minHash(input_matrix):
 
 
 def main():
-    hashed_shingles, docs = shingles()
-    inp_mtrx = input_matrix(hashed_shingles, docs)
-    minHash(inp_mtrx)
-    
-    
+    MYDIR = dirname(__file__)  # gives back your directory path
+    hashed_shingles, docs = create_shingles(MYDIR)
+    inp_mtrx = create_input_matrix(hashed_shingles, docs)
+    sm = minHash(inp_mtrx, docs)
+    print(sm)
+
 if __name__ == "__main__":
     main()
