@@ -118,9 +118,10 @@ def minHash(input_matrix, docs):
     p = next_prime(max_shingle_value + 1)  # p = next_prime(max_shingle_value)
     a_coef = randomCoefficients(hash_no)
     b_coef = randomCoefficients(hash_no)
-
+    signature_matrix = []
     # initialize signature matrix
-    signature_matrix = [[p - 1] * (len(docs) - 1)] * (len(input_matrix) - 1)
+    for j in range(hash_no):
+       signature_matrix.append([p + 1] * (len(docs) - 1))
     print("signature_matrix: ", signature_matrix)
 
     # for every row of the input matrix (every hashed single)
@@ -142,7 +143,7 @@ def minHash(input_matrix, docs):
                     # if hash_function(hf) is smaller than sig_matrix(row,column)
                     if hash_func[hf] < signature_matrix[hf][column]:
                         # set sig_matrix(row,column) to hash_function(hf)
-                        signature_matrix[row][column] = hash_func[hf]
+                        signature_matrix[hf][column] = hash_func[hf]
     return signature_matrix
 
 
@@ -151,7 +152,10 @@ def main():
     hashed_shingles, docs = create_shingles(MYDIR)
     inp_mtrx = create_input_matrix(hashed_shingles, docs)
     sm = minHash(inp_mtrx, docs)
-    print(sm)
+    for r in range(len(sm)):
+        print("minHash: ", r, sm[r])
+
+    #print(sm)
 
 if __name__ == "__main__":
     main()
