@@ -2,9 +2,8 @@ import math
 import binascii
 import random
 import re
-from os.path import isfile, join, dirname
+from os.path import dirname
 import os
-import nltk
 from nltk.corpus import stopwords
 
 # get documents directory
@@ -65,6 +64,7 @@ def create_shingles(MYDIR):
     for r in range(len(zip_list)):
         print("zip_list: ", zip_list[r])
     return zip_list, docs
+
 
 # Given the zip_list and docs list it creates the input matrix (sparse matrix).
 # input_matrix: rows: hashed shingles
@@ -173,29 +173,107 @@ def get_b_r(length_of_sign_matrix):
     return b, r
 
 
-# creates bands given the signature matrix
+# Creates bands given the signature matrix.
+# Separates the signature_matrix rows (n in tolat)
+# to b bands each of which consists of r rows (b*r=n)
 def create_bands(signature_matrix):
     bands = []
     b, r = get_b_r(len(signature_matrix))
     print("\n#bands = ", b, "#rows = ", r)
 
+    row_to_add = 0
     for band in range(b):
         rows = []
         for row in range(r):
-            rows.append(signature_matrix[band + row])
+            # print("band,row", band, row)
+            rows.append(signature_matrix[row_to_add])
+            row_to_add = row_to_add+1
         bands.append([band, rows])
     return bands
 
 
+# Create buckets given the bands.
+# Hashes each column of bands to some large number of buckets.
+# The hash function gives the position in which the column
+# in which it will be placed in the buckets array.
+# We use a separate bucket array for each band, so columns with the same vector
+# in different bands will not hash to the same bucket.
+def create_hash_table(bands, k):
+    buckets = []
+    for i in range(len(bands)):
+        row = []
+        for j in range(k):
+            row.append([])
+        buckets.append(row)
+
+    a = random.randint(1, 99)  # hash function parameters
+    b = random.randint(1, 99)
+    for band in range(len(bands)):
+        for column in range(len(bands[band][1][0])):
+            sum = 0
+            for band_len in range(len(bands[band][1])):
+                # print(bands[band][1][band_len][column], end=', ')
+                sum = sum + bands[band][1][band_len][column]
+            position_in_hashed = ((a * sum + b) % 99) % k
+            buckets[band][position_in_hashed].append(column)
+        #     print("\tposition -->", position_in_hashed)
+        # print("end band\n")
+    return buckets
+
+
+# The buckets array is a sparse array, so candidate_column_pairs function
+# returns only the candidate pairs of documents (zip array of buckets)
+def candidate_column_pairs(buckets):
+    candidate_pairs_list = []
+    for row in range(len(buckets)):
+        row_candidates_matches = []
+        for column in range(len(buckets[row])):
+            if len(buckets[row][column]) > 1:
+                column_candidates_matches = []
+                for matches in range(len(buckets[row][column])):
+                    column_candidates_matches.append(buckets[row][column][matches])
+                row_candidates_matches.append(column_candidates_matches)
+        candidate_pairs_list.append(row_candidates_matches)
+    return candidate_pairs_list
+
+
+# jaccard_similarity function calculates the Jaccard similarity of 2 lists
+def jaccard_similarity(list1, list2):
+    s1 = set(list1)
+    s2 = set(list2)
+    return float(len(s1.intersection(s2)) / len(s1.union(s2)))
+
+
+# document_similarities function caclulates the Jaccard similarity of all pairs
+def document_similarities(cand_pairs, sign_mtrx, docs):
+    similarities = []
+    for bucket in range(len(cand_pairs)):
+        for row in range(len(cand_pairs[bucket])):
+            for l in range(len(cand_pairs[bucket][row])):
+                for s_l in range(l + 1, len(cand_pairs[bucket][row])):
+                    first = cand_pairs[bucket][row][l]
+                    second = cand_pairs[bucket][row][s_l]
+                    list_1 = [i[first] for i in sign_mtrx]
+                    list_2 = [i[second] for i in sign_mtrx]
+                    js = jaccard_similarity(list_1, list_2)
+                    similarities.append([docs[first + 1], docs[second + 1], js])
+    return similarities
+
+
 def main():
     MYDIR = dirname(__file__)  # gives back your directory path
-    hash_num = 10
+    hash_num = 10  # number of hash functions
+    k = 30  # number of buckets (in a row of bucket buckets array)
 
+    # read documents, preprocessing, hashed shingles creation
     hashed_shingles, docs = create_shingles(MYDIR)
+    # create input matrix with 0/1 for hashed shingles and documents
     inp_mtrx = create_input_matrix(hashed_shingles, docs)
+    # create signature matrix given the input matrix
     sign_mtrx = minHash(inp_mtrx, docs, hash_num)
     for r in range(len(sign_mtrx)):
-        print("minHash:", r, "-->", sign_mtrx[r])
+        print("sign_mtrx:", r, "-->", sign_mtrx[r])
+    # create bands given the signature matrix
     bands = create_bands(sign_mtrx)
     print("bands: ")
     for r in range(len(bands)):
@@ -205,9 +283,23 @@ def main():
                 print(bands[r][1][s_r])
             else:
                 print("\t", bands[r][1][s_r])
+    # create buckets given the bands
+    buckets = create_hash_table(bands, k)
+    for r in range(len(buckets)):
+        print("buckets:", r, "-->", buckets[r])
+    # find candidate pairs
+    cand_pairs = candidate_column_pairs(buckets)
+    for r in range(len(cand_pairs)):
+        print("cand_pairs:", r, "-->", cand_pairs[r])
+    # calculate pairs similarities (Jaccard similarity)
+    similarities = document_similarities(cand_pairs, sign_mtrx, docs)
+    # remove dublicates
+    similarities = [ii for n, ii in enumerate(similarities) if ii not in similarities[:n]]
+    # sort results
+    similarities = sorted(similarities, key=lambda s: s[2], reverse=True)
+    for r in range(len(similarities)):
+        print("similarities:", r, "-->", similarities[r])
 
-
-    #print(sm)
 
 if __name__ == "__main__":
     main()
