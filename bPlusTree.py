@@ -173,7 +173,7 @@ class BPlusTree(object):
         if query == 'r':  # range query
             while flag and node:
                 for i, node_data in enumerate(node.keys):
-                    print(node_data, node.values[i])
+                    # print(node_data, node.values[i])
                     if node_data >= max:
                         flag = False
                         break
@@ -184,7 +184,7 @@ class BPlusTree(object):
         else:  # exact query
             for i, item in enumerate(node.keys):
                 if key == item:
-                    print("found: keys:", node.keys[i], " found: value ", node.values[i])
+                    print("found word", node.keys[i], " in documents:", node.values[i])
                     return node.values[i]
 
         print("Word not found")
@@ -260,10 +260,10 @@ def bplustree(dictionary):
     for doc in dictionary:  # for each document
         for word in doc[0]:  # for each word in document
             bplustree.insert(word, doc[1])
-            print(word, doc[1])
+            # print(word, doc[1])
 
-    bplustree.printTree()
-    bplustree.showAllData()
+    # bplustree.printTree()
+    # bplustree.showAllData()
     return bplustree
 
 
@@ -298,52 +298,3 @@ def Preprocessing(contentsRaw):
     filteredContents = [word for word in filteredContents if word not in stopwords.words('english')]
 
     return filteredContents
-
-
-def main():
-    query_type = ""
-    dictionary = []
-    point = 0  # to keep track of which text I am searching into
-
-    # build tree
-    path_of_docs = MYDIR + '/Datasets/corpus20090418'  # + input_theme  # execute path+files or dataset +file of documents
-    documents = docs_to_search(path_of_docs)
-    for doc in documents[1]:
-        file = open(doc, "r", encoding="UTF-8", errors='ignore')  # open file
-        words = file.read()  # read file
-        raw_dictionary = list(words.split())  # text to list
-        doc_dictionary = [Preprocessing(raw_dictionary), documents[0][point]]  # words preprocessing
-        point += 1
-        dictionary.append(doc_dictionary)
-
-    tree = bplustree(dictionary)
-
-    # queries
-    while query_type != "r" and query_type != "e" and query_type != "q":
-        print("\nType 'r' for range query")
-        print("Type 'e' for exact query")
-        print("Type 'q' for exit")
-        query_type = input("Please select the type of the query:")
-
-        if query_type == "r":
-            l_bound = input("Please type the lower bound: ")
-            u_bound = input("Please type the upper bound: ")
-
-            if l_bound > u_bound:  # if not given in the correct order, then change the order
-                temp = u_bound
-                u_bound = l_bound
-                l_bound = temp
-
-            tree.retrieve(l_bound, u_bound, query_type)
-            query_type = ""
-        elif query_type == 'e':
-            l_bound = input("Please type word you are looking for: ")
-            u_bound = l_bound
-            tree.retrieve(l_bound, u_bound, query_type)
-            query_type = ""
-        elif query_type == 'q':
-            return
-
-
-if __name__ == '__main__':
-    main()

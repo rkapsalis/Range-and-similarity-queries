@@ -15,7 +15,7 @@ from nltk.corpus import stopwords
 # return:
 # 1. zip_list: list of which each row contains hashed shingle and the names of the documents in which it appears
 # 2. docs: the names of all documents
-def create_shingles(MYDIR):
+def create_shingles(MYDIR, sim_docs):
     k = 5
     docs = [""]
     zip_list = []
@@ -23,43 +23,43 @@ def create_shingles(MYDIR):
     hashed_shingles = []
     path_of_docs = MYDIR + '/sample/'
     print("Preprocessing...")
-    for root, dirs, files in os.walk(path_of_docs, topdown=False):
-        # for every file
-        for name in files:
-            print("name:", name)
-            doc = os.path.join(root, name)
-            # read file
-            file = open(doc, "r", encoding="UTF-8", errors='ignore')
-            # put all words in one line
-            file = file.read().replace('\n', ' ').replace('\r', ' ')
-            # remove punctuation
-            new_s = re.sub(r'[^\w\s]', ' ', file.lower())
 
-            set(stopwords.words("english"))
-            # remove stopwords
-            filteredContents = [word for word in new_s.split() if word not in stopwords.words('english')]
-            filteredContents = ' '.join(filteredContents)
-            # store file names in array
-            docs.append(name)
-            for i in range(len(filteredContents) - k + 1):
-                # create singles
-                shingle = filteredContents[i:i + k]
-                # create hashed shingle
-                hashed = binascii.crc32(shingle.encode('utf8')) & 0xffffffff  # 32bit
-                if hashed not in hashed_shingles:
-                    # store unique hashed shingles
-                    hashed_shingles.append(hashed)
-                # if the shingle is not in the list
-                if not any((x[0] == hashed) for x in zip_list):
-                    # store shingle in array
-                    shingles.append(shingle)
-                    # store shingle and document name in array
-                    zip_list.append([hashed, [name]])
-                else:
-                    # store name of document in the corresponding position
-                    position = [(i, el.index(hashed)) for i, el in enumerate(zip_list) if hashed == el[0]]
-                    if name not in zip_list[position[0][0]][1]:
-                        zip_list[position[0][0]][1].append(name)
+    # for every file
+    for name in sim_docs:
+        print("name:", name)
+        doc = os.path.join(path_of_docs, name)
+        # read file
+        file = open(doc, "r", encoding="UTF-8", errors='ignore')
+        # put all words in one line
+        file = file.read().replace('\n', ' ').replace('\r', ' ')
+        # remove punctuation
+        new_s = re.sub(r'[^\w\s]', ' ', file.lower())
+
+        set(stopwords.words("english"))
+        # remove stopwords
+        filteredContents = [word for word in new_s.split() if word not in stopwords.words('english')]
+        filteredContents = ' '.join(filteredContents)
+        # store file names in array
+        docs.append(name)
+        for i in range(len(filteredContents) - k + 1):
+            # create singles
+            shingle = filteredContents[i:i + k]
+            # create hashed shingle
+            hashed = binascii.crc32(shingle.encode('utf8')) & 0xffffffff  # 32bit
+            if hashed not in hashed_shingles:
+                # store unique hashed shingles
+                hashed_shingles.append(hashed)
+            # if the shingle is not in the list
+            if not any((x[0] == hashed) for x in zip_list):
+                # store shingle in array
+                shingles.append(shingle)
+                # store shingle and document name in array
+                zip_list.append([hashed, [name]])
+            else:
+                # store name of document in the corresponding position
+                position = [(i, el.index(hashed)) for i, el in enumerate(zip_list) if hashed == el[0]]
+                if name not in zip_list[position[0][0]][1]:
+                    zip_list[position[0][0]][1].append(name)
 
     for r in range(len(zip_list)):
         print("zip_list: ", zip_list[r])
@@ -258,48 +258,3 @@ def document_similarities(cand_pairs, sign_mtrx, docs):
                     js = jaccard_similarity(list_1, list_2)
                     similarities.append([docs[first + 1], docs[second + 1], js])
     return similarities
-
-
-def main():
-    MYDIR = dirname(__file__)  # gives back your directory path
-    hash_num = 10  # number of hash functions
-    k = 30  # number of buckets (in a row of bucket buckets array)
-
-    # read documents, preprocessing, hashed shingles creation
-    hashed_shingles, docs = create_shingles(MYDIR)
-    # create input matrix with 0/1 for hashed shingles and documents
-    inp_mtrx = create_input_matrix(hashed_shingles, docs)
-    # create signature matrix given the input matrix
-    sign_mtrx = minHash(inp_mtrx, docs, hash_num)
-    for r in range(len(sign_mtrx)):
-        print("sign_mtrx:", r, "-->", sign_mtrx[r])
-    # create bands given the signature matrix
-    bands = create_bands(sign_mtrx)
-    print("bands: ")
-    for r in range(len(bands)):
-        print(r, "-->", end='')
-        for s_r in range(len(bands[r][1])):
-            if s_r == 0:
-                print(bands[r][1][s_r])
-            else:
-                print("\t", bands[r][1][s_r])
-    # create buckets given the bands
-    buckets = create_hash_table(bands, k)
-    for r in range(len(buckets)):
-        print("buckets:", r, "-->", buckets[r])
-    # find candidate pairs
-    cand_pairs = candidate_column_pairs(buckets)
-    for r in range(len(cand_pairs)):
-        print("cand_pairs:", r, "-->", cand_pairs[r])
-    # calculate pairs similarities (Jaccard similarity)
-    similarities = document_similarities(cand_pairs, sign_mtrx, docs)
-    # remove dublicates
-    similarities = [ii for n, ii in enumerate(similarities) if ii not in similarities[:n]]
-    # sort results
-    similarities = sorted(similarities, key=lambda s: s[2], reverse=True)
-    for r in range(len(similarities)):
-        print("similarities:", r, "-->", similarities[r])
-
-
-if __name__ == "__main__":
-    main()
