@@ -2,7 +2,6 @@ from __future__ import annotations
 from os import listdir
 from os.path import isfile, join, dirname
 import re
-from math import floor
 
 MYDIR = dirname(__file__)  # gives back your directory path
 
