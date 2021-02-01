@@ -1,7 +1,6 @@
 from __future__ import annotations
 from os.path import dirname
 from pandas import DataFrame
-
 import bPlusTree
 import lsh
 import pandas
@@ -18,6 +17,7 @@ s_k = 5
 
 MYDIR = dirname(__file__)  # gives back your directory path
 
+
 def main():
     query_type = ""
     dictionary = []
@@ -26,7 +26,7 @@ def main():
 
     print("\nPreprocessing...")
     # get directory
-    # path_of_docs = MYDIR + '/Datasets/corpus20090418/'
+    # path_of_docs = MYDIR + 'Dataset/corpus20090418/'
     path_of_docs = MYDIR + '/sample/'
 
     documents = bPlusTree.docs_to_search(path_of_docs)
@@ -54,11 +54,11 @@ def main():
 
         # sim_docs list contains:
         # - in the preprocessing phase: only the documents names in which the query found
-        # - at the beginning of LSH (on each row): · the name of one documentsin which the query found
+        # - at the beginning of LSH (on each row): · the name of one documents in which the query is found
         #                                          · all the text of the document as one string variable
         sim_docs = []
 
-        # if user select "range query"
+        # if user selects "range query"
         if query_type == "r":
             l_bound = input("Please type the lower bound: ").lower()
             u_bound = input("Please type the upper bound: ").lower()
@@ -68,7 +68,7 @@ def main():
                 u_bound = l_bound
                 l_bound = temp
 
-            # search_results: list with all the documents for words in thw given range
+            # search_results: list with all the documents for words in the given range
             # contains duplicates
             search_results = tree.retrieve(l_bound, u_bound, query_type)
             # if non empty
@@ -83,7 +83,7 @@ def main():
                             sim_docs.append(search_results[word][1][doc_list])
             print("sim_docs", sim_docs)
             query_type = ""
-        # if user select "exact query"
+        # if user selects "exact query"
         elif query_type == 'e':
             l_bound = input("Please type the word you are looking for: ").lower()
             u_bound = l_bound
@@ -153,20 +153,27 @@ def main():
             pandas.set_option('display.max_columns', None)
             pandas.set_option('display.width', None)
 
-            # uncomment the above to print DataFrame with one more column (Similarity_with_words) for experiments
+            # uncomment the code below to print DataFrame with one more column (Similarity_with_words) for experiments
 
-            # word_js = []
-            # for r in range(len(similarities)):
-            #     for d_r, d_i in enumerate(dictionary):
-            #         if dictionary[d_r][1] == similarities[r][0]:
-            #             l1_list = dictionary[d_r][0]
-            #         if dictionary[d_r][1] == similarities[r][1]:
-            #             l2_list = dictionary[d_r][0]
-            #     word_js.append(lsh.jaccard_similarity(l1_list, l2_list))
-            # similarities_df.insert(3, 'Similarity_with_words', word_js, True)
-
+            word_js = []
+            for r in range(len(similarities)):
+                for d_r, d_i in enumerate(dictionary):
+                    if dictionary[d_r][1] == similarities[r][0]:
+                        l1_list = dictionary[d_r][0]
+                    if dictionary[d_r][1] == similarities[r][1]:
+                        l2_list = dictionary[d_r][0]
+                word_js.append(lsh.jaccard_similarity(l1_list, l2_list))
+            similarities_df.insert(3, 'Similarity_with_words', word_js, True)
 
             print(similarities_df)
+
+            # plot chart
+            ax = plt.gca()
+
+            similarities_df.plot(kind='line', y='Similarity_with_signatures', ax=ax)
+            similarities_df.plot(kind='line', y='Similarity_with_words', color='red', ax=ax)
+
+            plt.show()
 
 
 if __name__ == "__main__":
