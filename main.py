@@ -7,11 +7,11 @@ import pandas
 import matplotlib.pyplot as plt
 
 # The maximum number of keys each node can hold
-order = 4
+order = 8
 # number of hash functions
-hash_num = 150
+hash_num = 100
 # number of buckets (in a row of buckets array)
-k = 30
+k = 40
 # k for k-shingles
 s_k = 5
 

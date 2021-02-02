@@ -141,7 +141,7 @@ class LeafNode(Node):
 
 class BPlusTree(object):
     # represents a b+ tree
-    def __init__(self, order=4):
+    def __init__(self, order):
         # First node must be leaf
         self.root: Node = LeafNode(order)
         self.order: int = order
