@@ -89,14 +89,14 @@ def next_prime(value):
             return num
 
 
-def randomCoefficients(functions_no):
+def randomCoefficients(funct_no):
     # Generates random numbers a,b for every hash function
 
     randomNumbers = []
     functions_counter = 0
     max_shingle_value = 2 ** 32 - 1
     # for every hash function
-    while functions_counter < functions_no:
+    while functions_counter < funct_no:
         # generate random number in range (0, max_shingle_value)
         # random.seed(0)
         random_number = random.randint(0, max_shingle_value)
@@ -155,7 +155,8 @@ def minHash(input_matrix, docs, hash_num):
 
 def get_b_r(length_of_sign_matrix):
     # Finds the set of table size divisors and
-    # assigns appropriate values to the variables r and b for for the number of bands and rows
+    # assigns appropriate values to the variables
+    # r and b for for the number of bands and rows
 
     factors = []
     for i in range(1, length_of_sign_matrix + 1):
@@ -203,12 +204,12 @@ def create_bands(signature_matrix):
 
 
 def create_hash_table(bands, k):
-    # Create buckets given the bands.
+    # Creates buckets given the bands.
     # Hashes each column of bands to some large number of buckets.
     # The hash function gives the position in which the column
     # will be placed in the buckets array.
-    # We use a separate bucket array for each band, so columns with the same vector
-    # in different bands will not hash to the same bucket.
+    # We use a separate bucket array for each band, so columns  vector
+    # with the same in different bands will not hash to the same bucket.
 
     buckets = []
     for i in range(len(bands)):
@@ -254,7 +255,7 @@ def candidate_column_pairs(buckets):
 
 
 def jaccard_similarity(list1, list2):
-    # jaccard_similarity function calculates the Jaccard similarity of 2 lists
+    # calculates the Jaccard similarity of 2 lists
 
     s1 = set(list1)
     s2 = set(list2)
@@ -262,7 +263,7 @@ def jaccard_similarity(list1, list2):
 
 
 def document_similarities(cand_pairs, sign_mtrx, docs):
-    # document_similarities function calculates the Jaccard similarity of all pairs
+    # calculates the Jaccard similarity of all pairs
 
     similarities = []
     # for each bucket array in candidate pairs list

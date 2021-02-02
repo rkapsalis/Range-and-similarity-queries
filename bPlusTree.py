@@ -8,24 +8,17 @@ MYDIR = dirname(__file__)
 
 
 class Node:
-    """
-    Node object
-    ...
+    # represents Node of tree
 
-    Attributes
-    ----------
-        order (int): The maximum number of keys each node can hold (branching factor).
-
-    """
     uidCounter = 0
 
     def __init__(self, order):
+        # The max number of keys each node can hold
         self.order = order
         self.parent: Node = None
         self.keys = []
         self.values = []
 
-        #  This is for Debugging purposes only
         Node.uidCounter += 1
         self.uid = self.uidCounter
 
@@ -62,22 +55,24 @@ class Node:
         for child in right.values:
             if isinstance(child, Node):
                 child.parent = right
-        # Return the 'top node'
+        # Return temp parent node
         return self
 
     def isEmpty(self) -> bool:
-        # check if node is empty
+        # Check if node is empty
         return len(self.keys) == 0
 
     def isRoot(self) -> bool:
-        # check if node is root
+        # Check if node is root
         return self.parent is None
 
 
 class LeafNode(Node):
+    # represents leaf Node of tree
+
     def __init__(self, order):
         super().__init__(order)
-
+        # Pointers to previous and next leaves
         self.prevLeaf: LeafNode = None
         self.nextLeaf: LeafNode = None
 
@@ -108,10 +103,10 @@ class LeafNode(Node):
                 break
 
     def split(self) -> Node:
-        # Split a full leaf node. (Different method used than before - node object)
-        # new parent node
+        # Splits a full leaf node
+        # New parent node
         top = Node(self.order)
-        # new right node
+        # New right node
         right = LeafNode(self.order)
         # Break the node at m/2th position.
         mid = int(self.order // 2)
@@ -123,30 +118,32 @@ class LeafNode(Node):
         right.keys = self.keys[mid:]
         # Right leaf takes values from mid index till end
         right.values = self.values[mid:]
-        # Set right leaf's prevLeaf (the spited leaf)
+        # Set right leafs' prevLeaf (the splitted leaf)
         right.prevLeaf = self
-        # Set right leaf's nextLeaf
+        # Set right leafs' nextLeaf
         right.nextLeaf = self.nextLeaf
 
-        # Parent takes as keys teh first key of right leaf
+        # Parent takes as keys the first key of right leaf
         top.keys = [right.keys[0]]
-        # Setup the pointers to child nodes (the 2 leafs)
+        # Setup the pointers to child nodes (the 2 leaves)
         top.values = [self, right]
 
         # Left leaf takes keys till mid index
         self.keys = self.keys[:mid]
-        # Left leaf takes values till mid+1 index
+        # Left leaf takes values till mid index
         self.values = self.values[:mid]
         # Setup pointer to next leaf (right leaf)
         self.nextLeaf = right
 
-        # Return the 'top node' (parent)
+        # Return the temp parent
         return top
 
 
 class BPlusTree(object):
+    # represents a b+ tree
     def __init__(self, order=4):
-        self.root: Node = LeafNode(order)  # First node must be leaf (to store data).
+        # First node must be leaf
+        self.root: Node = LeafNode(order)
         self.order: int = order
 
     @staticmethod
@@ -156,16 +153,17 @@ class BPlusTree(object):
 
         # for every key of the given node
         for i, item in enumerate(node.keys):
-            #  if search key is lexically smaller than node key
+            # if search key is lexically less than node key
             if key < item:
                 return node.values[i], i
-            # if search key is lexically bigger than node key (end of node)
+            # if search key is lexically greater than node key (end of node)
             elif i + 1 == len(node.keys):
-                return node.values[i + 1], i + 1  # return right-most node/pointer.
+                # return right-most node/pointer.
+                return node.values[i + 1], i + 1
 
     @staticmethod
     def _mergeUp(parent: Node, child: Node, index):
-        # After the split in the node-child _mergeUp() corrects the pointers to and from the parent node
+        # After the split in the node-child, this function corrects the pointers to and from the parent node
         # and the intermediate value, that resulted after the split, is inserted in the parent.
 
         # remove parent pointer to node-child
@@ -179,7 +177,7 @@ class BPlusTree(object):
                 c.parent = parent
 
         # Search in the parent node for the appropriate location
-        # to enter the key and the 2 values of node-child
+        # to add the key and the 2 values of node-child
         for i, item in enumerate(parent.keys):
             #  if key of the child is lexically smaller than key of the parent
             if pivot < item:
@@ -187,7 +185,7 @@ class BPlusTree(object):
                 parent.keys = parent.keys[:i] + [pivot] + parent.keys[i:]
                 parent.values = parent.values[:i] + child.values + parent.values[i:]
                 break
-            # if key of the child is lexically smaller than the key of the parent (end of node)
+            # if key of the child is lexically less than the key of the parent (end of node)
             elif i + 1 == len(parent.keys):
                 # append pivot and child values to parent in the end of parent node
                 parent.keys += [pivot]
@@ -195,6 +193,8 @@ class BPlusTree(object):
                 break
 
     def insert(self, key, value):
+        # inserts a new key,value pair into tree
+
         node = self.root
 
         # While we are in internal nodes... search for leaves.
@@ -218,12 +218,14 @@ class BPlusTree(object):
                 node = parent
             # node is root
             else:
-                # Split & Set node as the 'top' node.
+                # split and set node as the temp parent node.
                 node = node.split()
                 # set node as tree root
                 self.root = node
 
     def retrieve(self, key, max_value, query):
+        # returns the documents that contain the requested key
+
         keys_values = []
         node = self.root
         flag = True
@@ -253,14 +255,15 @@ class BPlusTree(object):
         return None
 
     def printTree(self):
-        # check if root is empty
+
+        # check if tree is empty
         if self.root.isEmpty():
             print('The b+ tree is empty!')
             # empty tree --> stop program
             return
 
         # queue: list of nodes to print and their height from the root
-        # set as first node thw root with height=0
+        # set as first node the root with height=0
         queue = [self.root, 0]
 
         # while queue is not empty
@@ -278,6 +281,7 @@ class BPlusTree(object):
                   '\t parent -> ', node.parent.uid if node.parent else None)
 
     def getLeftmostLeaf(self):
+
         # check if tree is empty
         if not self.root:
             return None

@@ -6,7 +6,7 @@ import lsh
 import pandas
 import matplotlib.pyplot as plt
 
-# The maximum number of keys each node can hold (branching factor)
+# The maximum number of keys each node can hold
 order = 4
 # number of hash functions
 hash_num = 150
@@ -26,8 +26,7 @@ def main():
 
     print("\nPreprocessing...")
     # get directory
-    # path_of_docs = MYDIR + 'Dataset/corpus20090418/'
-    path_of_docs = MYDIR + '/sample/'
+    path_of_docs = MYDIR + '/Datasets/corpus20090418/'
 
     documents = bPlusTree.docs_to_search(path_of_docs)
     # for every document in directory
@@ -55,7 +54,7 @@ def main():
         # sim_docs list contains:
         # - in the preprocessing phase: only the documents names in which the query found
         # - at the beginning of LSH (on each row): · the name of one documents in which the query is found
-        #                                          · all the text of the document as one string variable
+        #                                          · all the words of the document as one string variable
         sim_docs = []
 
         # if user selects "range query"
@@ -153,8 +152,6 @@ def main():
             pandas.set_option('display.max_columns', None)
             pandas.set_option('display.width', None)
 
-            # uncomment the code below to print DataFrame with one more column (Similarity_with_words) for experiments
-
             word_js = []
             for r in range(len(similarities)):
                 for d_r, d_i in enumerate(dictionary):
@@ -169,6 +166,8 @@ def main():
 
             # plot chart
             ax = plt.gca()
+            plt.xlabel('Number of document pair')
+            plt.ylabel('similarity')
 
             similarities_df.plot(kind='line', y='Similarity_with_signatures', ax=ax)
             similarities_df.plot(kind='line', y='Similarity_with_words', color='red', ax=ax)
